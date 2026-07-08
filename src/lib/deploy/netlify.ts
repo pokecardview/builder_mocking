@@ -1,13 +1,13 @@
 import { NetlifyAPI } from 'netlify';
 
 export async function deployToNetlify(accessToken: string, repoUrl: string, siteName: string) {
-  const client = new NetlifyAPI(accessToken);
+  const client = new NetlifyAPI(accessToken, {});
   const site = await client.createSite({
     body: {
       name: siteName,
       repo: {
         provider: 'github',
-        repo: repoUrl, // "owner/repo"
+        repo: repoUrl,
         private: true,
         branch: 'main',
         cmd: 'npm run build',
