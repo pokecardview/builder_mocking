@@ -14,6 +14,12 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="fr" className={inter.variable}>
+      <head>
+        <link
+          rel="stylesheet"
+          href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"
+        />
+      </head>
       <body className="font-sans bg-[var(--bg-base)] text-[var(--text-primary)] antialiased">
         <div className="flex h-screen w-screen overflow-hidden">
           <Sidebar />
