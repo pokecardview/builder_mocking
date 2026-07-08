@@ -1,9 +1,11 @@
-import { NetlifyAPI } from 'netlify';
-
 export async function deployToNetlify(accessToken: string, repoUrl: string, siteName: string) {
-  const client = new NetlifyAPI(accessToken, {});
-  const site = await client.createSite({
-    body: {
+  const response = await fetch('https://api.netlify.com/api/v1/sites', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
       name: siteName,
       repo: {
         provider: 'github',
@@ -13,9 +15,15 @@ export async function deployToNetlify(accessToken: string, repoUrl: string, site
         cmd: 'npm run build',
         dir: '.next',
       },
-    },
+    }),
   });
-  await client.createSiteBuild({ site_id: site.id });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Netlify create site failed: ${response.status} ${errorText}`);
+  }
+
+  const site = await response.json();
   return {
     url: `https://${site.default_domain}`,
     siteId: site.id,
