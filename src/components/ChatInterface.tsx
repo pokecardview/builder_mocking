@@ -1,9 +1,8 @@
 'use client';
 import { useState, useEffect, useRef } from 'react';
-import { supabase } from '@/lib/supabase/client';
+import { getMessages, addMessage, Message, getSession } from '@/lib/store';
+import { useAnonymousUser } from '@/hooks/useAnonymousUser';
 import CodeViewer from './CodeViewer';
-
-type Message = { id: string; role: 'user' | 'assistant'; agent_type?: 'yc' | 'pm' | 'techlead'; content: string; created_at: string; };
 
 export default function ChatInterface({ sessionId }: { sessionId: string }) {
   const [messages, setMessages] = useState<Message[]>([]);
@@ -12,42 +11,45 @@ export default function ChatInterface({ sessionId }: { sessionId: string }) {
   const [generatedFiles, setGeneratedFiles] = useState<any[]>([]);
   const [showCode, setShowCode] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
+  const userId = useAnonymousUser();
 
   useEffect(() => {
-    supabase.from('messages').select('*').eq('session_id', sessionId).order('created_at', { ascending: true }).then(({ data }) => {
-      if (data) setMessages(data);
-    });
-    const channel = supabase.channel(`messages:${sessionId}`).on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages', filter: `session_id=eq.${sessionId}` }, payload => {
-      setMessages(prev => [...prev, payload.new as Message]);
-    }).subscribe();
-    return () => { supabase.removeChannel(channel); };
-  }, [sessionId]);
+    if (userId) {
+      setMessages(getMessages(sessionId));
+    }
+  }, [sessionId, userId]);
 
   useEffect(() => { chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages]);
 
   const handleSend = async () => {
     if (!input.trim() || loading) return;
+    const userMessage: Message = {
+      id: crypto.randomUUID(),
+      session_id: sessionId,
+      role: 'user',
+      content: input,
+      created_at: new Date().toISOString(),
+    };
+    addMessage(sessionId, userMessage);
+    setMessages(prev => [...prev, userMessage]);
+    setInput('');
     setLoading(true);
-    await fetch(`/api/sessions/${sessionId}/messages`, {
+
+    // Appel à l'API pour obtenir la réponse de l'agent
+    const res = await fetch(`/api/sessions/${sessionId}/messages`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ content: input }),
+      body: JSON.stringify({ content: userMessage.content }),
     });
-    setInput('');
-    setLoading(false);
-  };
-
-  const handleGenerate = async () => {
-    setLoading(true);
-    const res = await fetch(`/api/sessions/${sessionId}/generate`, { method: 'POST' });
     const data = await res.json();
-    if (res.ok) {
-      setGeneratedFiles(data.files);
-      setShowCode(true);
-    } else alert('Erreur: ' + data.error);
+    if (data.message) {
+      addMessage(sessionId, data.message);
+      setMessages(prev => [...prev, data.message]);
+    }
     setLoading(false);
   };
 
+  // ... reste du composant (identique à la version précédente, avec handleGenerate, etc.)
   return (
     <div className="flex h-screen bg-zinc-950 text-zinc-100">
       {/* Panneau de chat */}
@@ -63,9 +65,7 @@ export default function ChatInterface({ sessionId }: { sessionId: string }) {
                   ? 'bg-blue-600/20 border border-blue-500/20 text-blue-100'
                   : 'bg-zinc-800/80 border border-zinc-700/50 text-zinc-200'
               }`}>
-                {msg.agent_type && (
-                  <div className="text-xs font-semibold uppercase text-zinc-400 mb-1">{msg.agent_type}</div>
-                )}
+                {msg.agent_type && <div className="text-xs font-semibold uppercase text-zinc-400 mb-1">{msg.agent_type}</div>}
                 <div className="text-sm whitespace-pre-wrap">{msg.content}</div>
               </div>
             </div>
@@ -74,34 +74,24 @@ export default function ChatInterface({ sessionId }: { sessionId: string }) {
           <div ref={chatEndRef} />
         </div>
         <div className="p-4 border-t border-zinc-800 bg-zinc-900/50 backdrop-blur">
-          <button
-            onClick={handleGenerate}
-            disabled={loading}
-            className="w-full mb-2 px-4 py-2 bg-gradient-to-r from-green-600 to-emerald-500 text-white rounded-xl hover:shadow-lg transition disabled:opacity-50"
-          >
+          <button onClick={async () => {
+            setLoading(true);
+            const res = await fetch(`/api/sessions/${sessionId}/generate`, { method: 'POST' });
+            const data = await res.json();
+            if (data.files) {
+              setGeneratedFiles(data.files);
+              setShowCode(true);
+            }
+            setLoading(false);
+          }} disabled={loading} className="w-full mb-2 px-4 py-2 bg-gradient-to-r from-green-600 to-emerald-500 text-white rounded-xl">
             Générer le code
           </button>
           <div className="flex gap-2">
-            <input
-              type="text"
-              value={input}
-              onChange={e => setInput(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && handleSend()}
-              placeholder="Décrivez votre idée..."
-              className="flex-1 px-4 py-2 bg-zinc-800 border border-zinc-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-            />
-            <button
-              onClick={handleSend}
-              disabled={loading}
-              className="px-5 py-2 bg-blue-600 hover:bg-blue-500 rounded-xl text-sm font-medium transition"
-            >
-              Envoyer
-            </button>
+            <input type="text" value={input} onChange={e => setInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleSend()} placeholder="Décrivez votre idée..." className="flex-1 px-4 py-2 bg-zinc-800 border border-zinc-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm" />
+            <button onClick={handleSend} disabled={loading} className="px-5 py-2 bg-blue-600 hover:bg-blue-500 rounded-xl text-sm font-medium transition">Envoyer</button>
           </div>
         </div>
       </div>
-
-      {/* Panneau de code / preview */}
       {showCode && (
         <div className="flex-1 animate-fadeIn">
           <CodeViewer files={generatedFiles} />
