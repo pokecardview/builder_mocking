@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@octokit/rest": "^21.0.2",
+    "@opentelemetry/api": "^1.9.1",
     "@supabase/ssr": "^0.12.0",
     "@supabase/supabase-js": "^2.45.1",
     "autoprefixer": "^10.4.19",
