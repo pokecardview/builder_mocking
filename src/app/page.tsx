@@ -3,26 +3,18 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase/client';
 import { useAnonymousUser } from '@/hooks/useAnonymousUser';
-import Dashboard from '@/components/Dashboard';
 
 export default function HomePage() {
   const router = useRouter();
   const userId = useAnonymousUser();
   const [sessions, setSessions] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
-  const [selectedSession, setSelectedSession] = useState<string | null>(null);
 
   useEffect(() => {
     if (!userId) return;
-    const loadSessions = async () => {
-      const { data } = await supabase
-        .from('sessions')
-        .select('*')
-        .eq('user_id', userId)
-        .order('created_at', { ascending: false });
+    supabase.from('sessions').select('*').eq('user_id', userId).order('created_at', { ascending: false }).then(({ data }) => {
       if (data) setSessions(data);
-    };
-    loadSessions();
+    });
   }, [userId]);
 
   const createNewSession = async () => {
@@ -30,57 +22,59 @@ export default function HomePage() {
     const res = await fetch('/api/sessions', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        initial_message: 'Bonjour, je veux coacher mon idée.',
-        anonymous_user_id: userId,
-      }),
+      body: JSON.stringify({ initial_message: 'Bonjour, je veux coacher mon idée.', anonymous_user_id: userId }),
     });
     const data = await res.json();
-    if (data.session) {
-      router.push(`/chat/${data.session.id}`);
-    }
+    if (data.session) router.push(`/chat/${data.session.id}`);
     setLoading(false);
   };
 
   return (
-    <main className="flex min-h-screen flex-col items-center py-10 px-4 bg-gray-50">
-      <h1 className="text-4xl font-bold mb-8">ProdCoach</h1>
+    <div className="min-h-screen bg-gradient-to-br from-zinc-950 via-zinc-900 to-zinc-950 flex flex-col items-center justify-center px-6">
+      {/* Hero */}
+      <div className="text-center max-w-3xl animate-fadeIn">
+        <h1 className="text-5xl font-extrabold tracking-tight bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">
+          ProdCoach
+        </h1>
+        <p className="mt-4 text-xl text-zinc-400">
+          Coach IA · Challenge · Génération · Déploiement
+        </p>
+        <p className="mt-2 text-zinc-500">Transformez une idée brute en application déployée, sans friction.</p>
 
-      <button
-        onClick={createNewSession}
-        disabled={loading || !userId}
-        className="mb-8 bg-blue-600 text-white px-8 py-4 rounded-lg text-lg hover:bg-blue-700 transition disabled:opacity-50"
-      >
-        {loading ? 'Création...' : '➕ Nouveau coaching'}
-      </button>
-
-      <div className="w-full max-w-4xl space-y-6">
-        <h2 className="text-xl font-semibold mb-4">Mes coachings</h2>
-        {sessions.length === 0 && (
-          <p className="text-gray-500">Aucun coaching pour le moment.</p>
-        )}
-        {sessions.map((s) => (
-          <div key={s.id} className="bg-white rounded shadow p-4">
-            <div
-              className="flex justify-between items-center cursor-pointer hover:bg-gray-50 p-2"
-              onClick={() => router.push(`/chat/${s.id}`)}
-            >
-              <div>
-                <div className="font-medium">{s.title || 'Sans titre'}</div>
-                <div className="text-sm text-gray-500">{new Date(s.created_at).toLocaleString()}</div>
-              </div>
-              <span className="text-xs bg-gray-200 px-2 py-1 rounded">{s.status}</span>
-            </div>
-            <button
-              onClick={() => setSelectedSession(selectedSession === s.id ? null : s.id)}
-              className="text-sm text-blue-600 mt-2 hover:underline"
-            >
-              {selectedSession === s.id ? 'Masquer le tableau de bord' : 'Voir le tableau de bord'}
-            </button>
-            {selectedSession === s.id && <Dashboard sessionId={s.id} />}
-          </div>
-        ))}
+        <button
+          onClick={createNewSession}
+          disabled={loading || !userId}
+          className="mt-8 inline-flex items-center gap-2 px-8 py-4 bg-gradient-to-r from-blue-600 to-blue-500 text-white rounded-full text-lg font-semibold shadow-xl hover:shadow-blue-500/25 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          {loading ? (
+            <span className="animate-pulse">Création...</span>
+          ) : (
+            <>
+              <span>➕ Nouveau coaching</span>
+            </>
+          )}
+        </button>
       </div>
-    </main>
+
+      {/* Liste des coachings précédents */}
+      {sessions.length > 0 && (
+        <div className="mt-16 w-full max-w-4xl">
+          <h2 className="text-2xl font-bold mb-6 text-zinc-200">Mes coachings</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {sessions.map(s => (
+              <div
+                key={s.id}
+                onClick={() => router.push(`/chat/${s.id}`)}
+                className="p-5 bg-zinc-900 border border-zinc-800 rounded-xl cursor-pointer hover:border-zinc-700 hover:bg-zinc-800/50 transition-all backdrop-blur-sm"
+              >
+                <div className="font-medium text-zinc-200">{s.title || 'Sans titre'}</div>
+                <div className="text-sm text-zinc-500 mt-1">{new Date(s.created_at).toLocaleString()}</div>
+                <div className="mt-2 text-xs inline-block px-2 py-0.5 rounded-full bg-zinc-800 text-zinc-400">{s.status}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
   );
 }

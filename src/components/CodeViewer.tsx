@@ -1,13 +1,13 @@
 'use client';
 import { useState, useMemo } from 'react';
 import Prism from 'prismjs';
-import 'prismjs/themes/prism.css';
+import 'prismjs/themes/prism-tomorrow.css';
 
 interface GeneratedFile { file_path: string; content: string; }
 
 export default function CodeViewer({ files }: { files: GeneratedFile[] }) {
-  const [selectedFile, setSelectedFile] = useState<string>(files[0]?.file_path || '');
-  const [previewHtml, setPreviewHtml] = useState<string>('');
+  const [selectedFile, setSelectedFile] = useState(files[0]?.file_path || '');
+  const [previewHtml, setPreviewHtml] = useState('');
 
   const currentFile = files.find(f => f.file_path === selectedFile) || files[0];
   const highlighted = useMemo(() => {
@@ -17,50 +17,48 @@ export default function CodeViewer({ files }: { files: GeneratedFile[] }) {
     return Prism.highlight(currentFile.content, Prism.languages[lang] || Prism.languages.markup, lang);
   }, [currentFile]);
 
-  // Fonction pour préparer une preview : on combine les fichiers en un seul HTML
   const openPreview = () => {
-    const htmlFiles = files.filter(f => f.file_path.endsWith('.html') || f.file_path.endsWith('.tsx') || f.file_path.endsWith('.jsx'));
-    // Pour simplifier, on prend le contenu de tous les fichiers TSX et on les injecte dans un iframe sandboxé
-    const combined = htmlFiles.map(f => `<!-- ${f.file_path} -->\n${f.content}`).join('\n');
+    const combined = files
+      .filter(f => f.file_path.endsWith('.tsx') || f.file_path.endsWith('.jsx') || f.file_path.endsWith('.html'))
+      .map(f => `<!-- ${f.file_path} -->\n${f.content}`)
+      .join('\n\n');
     setPreviewHtml(combined);
   };
 
   return (
-    <div className="flex h-full border rounded bg-white">
-      {/* Liste des fichiers */}
-      <div className="w-1/5 border-r overflow-y-auto p-2">
-        <h3 className="font-bold text-sm mb-2">📁 Fichiers</h3>
+    <div className="flex h-full bg-zinc-950 text-zinc-100">
+      {/* File tree */}
+      <div className="w-1/5 border-r border-zinc-800 p-3 overflow-y-auto">
+        <h3 className="text-xs font-semibold uppercase text-zinc-500 mb-3">Explorateur</h3>
         {files.map(f => (
           <div
             key={f.file_path}
-            className={`text-xs p-1 cursor-pointer hover:bg-gray-100 ${f.file_path === selectedFile ? 'bg-blue-100' : ''}`}
+            className={`text-xs p-1.5 rounded cursor-pointer hover:bg-zinc-800 transition ${f.file_path === selectedFile ? 'bg-zinc-800 text-white' : 'text-zinc-400'}`}
             onClick={() => setSelectedFile(f.file_path)}
           >
-            {f.file_path}
+            📄 {f.file_path}
           </div>
         ))}
       </div>
-      {/* Code source */}
-      <div className="w-2/5 p-2 overflow-y-auto border-r">
-        <div className="flex justify-between items-center mb-2">
-          <h3 className="font-bold text-sm">💻 {currentFile?.file_path}</h3>
-          <button onClick={openPreview} className="text-xs bg-blue-500 text-white px-2 py-1 rounded">▶ Lancer la preview</button>
+
+      {/* Code panel */}
+      <div className="flex-1 flex flex-col">
+        <div className="p-3 border-b border-zinc-800 flex items-center justify-between">
+          <span className="text-sm text-zinc-400">{currentFile?.file_path}</span>
+          <button onClick={openPreview} className="px-3 py-1 bg-blue-600 rounded-lg text-xs hover:bg-blue-500 transition">▶ Preview</button>
         </div>
-        <pre className="text-xs overflow-x-auto bg-gray-50 p-2 rounded"><code dangerouslySetInnerHTML={{ __html: highlighted }} /></pre>
+        <div className="flex-1 overflow-y-auto p-4 bg-zinc-900">
+          <pre className="text-sm"><code dangerouslySetInnerHTML={{ __html: highlighted }} /></pre>
+        </div>
       </div>
-      {/* Preview */}
-      <div className="w-2/5 p-2">
-        <h3 className="font-bold text-sm mb-2">🖥️ Preview de l'application</h3>
-        {previewHtml ? (
-          <iframe
-            sandbox="allow-scripts allow-same-origin"
-            srcDoc={previewHtml}
-            className="w-full h-96 border"
-          />
-        ) : (
-          <p className="text-xs text-gray-500">Cliquez sur "Lancer la preview" pour voir le résultat.</p>
-        )}
-      </div>
+
+      {/* Preview panel */}
+      {previewHtml && (
+        <div className="w-2/5 border-l border-zinc-800 p-3">
+          <h3 className="text-xs font-semibold uppercase text-zinc-500 mb-3">Aperçu</h3>
+          <iframe sandbox="allow-scripts allow-same-origin" srcDoc={previewHtml} className="w-full h-full rounded-lg border border-zinc-700" />
+        </div>
+      )}
     </div>
   );
 }
